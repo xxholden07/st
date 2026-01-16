@@ -50,6 +50,51 @@ class CardColors:
     DESTROYED_OVERLAY = "#ff0000"
 
 
+# Símbolos/Ilustrações dos deuses usando emojis
+DEITY_SYMBOLS = {
+    # Grupo 1 - Deuses Supremos
+    "Zeus": "⚡👑",
+    "Odin": "👁️🦅",
+    "Amon": "☀️🐏",
+    "Anu": "⭐🌌",
+    # Grupo 2 - Deuses da Guerra
+    "Thor": "🔨⚡",
+    "Marte": "⚔️🛡️",
+    "Sekhmet": "🦁🔥",
+    "Nergal": "💀⚔️",
+    # Grupo 3 - Deuses da Sabedoria
+    "Thoth": "📚🐦",
+    "Minerva": "🦉📖",
+    "Mímir": "👁️💧",
+    "Nabu": "📜✍️",
+    # Grupo 4 - Deuses da Justiça
+    "Maat": "🪶⚖️",
+    "Balder": "☀️✨",
+    "Ishtar": "⭐💫",
+    "Têmis": "⚖️📜",
+    # Grupo 5 - Deuses do Submundo
+    "Osíris": "☥👑",
+    "Hel": "💀❄️",
+    "Hades": "💀🔱",
+    "Ereshkigal": "🌑💀",
+    # Grupo 6 - Deuses do Sol
+    "Rá": "☀️🦅",
+    "Apolo": "☀️🎵",
+    "Freyr": "🌾☀️",
+    "Shamash": "☀️⚖️",
+    # Grupo 7 - Deuses da Fertilidade
+    "Ísis": "🌙✨",
+    "Freya": "💕🐱",
+    "Deméter": "🌾🌻",
+    "Tammuz": "🌿🐑",
+    # Grupo 8 - Deuses Primordiais
+    "Nun": "🌊🌀",
+    "Ymir": "❄️👹",
+    "Caos": "🌀⬛",
+    "Tiamat": "🐉🌊"
+}
+
+
 class VisualCard(tk.Canvas):
     """Widget visual para representar uma carta."""
     
@@ -207,22 +252,54 @@ class VisualCard(tk.Canvas):
         )
     
     def draw_deity_name(self, colors: dict):
-        """Desenha o nome da divindade."""
+        """Desenha o nome e ilustração da divindade."""
+        # Ilustração do deus (símbolo emoji)
+        symbol = DEITY_SYMBOLS.get(self.card.name, "🏛️")
+        
+        # Círculo decorativo para o símbolo
+        cx = self.card_width // 2
+        cy = 55
+        radius = min(25, self.card_width // 8)
+        
+        # Fundo circular
+        self.create_oval(
+            cx - radius - 3, cy - radius - 3,
+            cx + radius + 3, cy + radius + 3,
+            fill="", outline=colors["accent"], width=2
+        )
+        self.create_oval(
+            cx - radius, cy - radius,
+            cx + radius, cy + radius,
+            fill=colors["bg"], outline=colors["border"], width=1
+        )
+        
+        # Símbolo do deus
+        font_size = max(12, min(18, self.card_width // 12))
+        self.create_text(
+            cx, cy,
+            text=symbol,
+            font=("Segoe UI Emoji", font_size)
+        )
+        
+        # Nome da divindade
         name = self.card.current_name
-        font_size = 18 if len(name) < 10 else 14
+        font_size = 14 if len(name) < 10 else 11
+        if self.card_width < 150:
+            font_size = max(8, font_size - 3)
         
         self.create_text(
-            self.card_width // 2, 75,
+            self.card_width // 2, 90,
             text=name.upper(),
             font=("Georgia", font_size, "bold"),
             fill=colors["fg"]
         )
         
         # Panteão
+        pantheon_size = 9 if self.card_width >= 150 else 7
         self.create_text(
-            self.card_width // 2, 100,
+            self.card_width // 2, 107,
             text=self.card.current_pantheon.value,
-            font=("Georgia", 10, "italic"),
+            font=("Georgia", pantheon_size, "italic"),
             fill=colors["accent"]
         )
     

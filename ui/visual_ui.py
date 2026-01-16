@@ -10,7 +10,7 @@ from models.card import Card, Pantheon
 from models.events import EventType, create_event
 from game.game_state import GameState, GamePhase
 from game.player import Player
-from ui.visual_card import VisualCard, MiniCard, CardColors
+from ui.visual_card import VisualCard, MiniCard, CardColors, DEITY_SYMBOLS
 from ui.visual_events import (
     RagnarokAnimation, OsirisJudgmentAnimation,
     BifrostAnimation, MysteriesAnimation, BattleAnimation
@@ -249,15 +249,25 @@ class GameWindow(tk.Tk):
         self.game_state = GameState()
         self.game_state.initialize_game([player1, player2])
         
+        self.selected_card = None
+        self.selected_attribute = None
+        
         self.show_game_screen()
     
     def show_game_screen(self):
         """Tela principal do jogo."""
         self.clear_window()
         
-        # Layout principal
-        self.main_frame = tk.Frame(self, bg="#0a0a1a")
-        self.main_frame.pack(fill="both", expand=True)
+        # Container principal
+        self.main_container = tk.Frame(self, bg="#0a0a1a")
+        self.main_container.pack(fill="both", expand=True)
+        
+        # Painel lateral - ações (criar primeiro para pack à direita)
+        self.create_action_panel()
+        
+        # Layout principal (à esquerda)
+        self.main_frame = tk.Frame(self.main_container, bg="#0a0a1a")
+        self.main_frame.pack(side="left", fill="both", expand=True)
         
         # Área superior - informações
         self.create_info_bar()
@@ -274,9 +284,6 @@ class GameWindow(tk.Tk):
         
         # Área do jogador (mão)
         self.create_player_area()
-        
-        # Painel lateral - ações
-        self.create_action_panel()
         
         self.update_game_display()
     
@@ -375,48 +382,88 @@ class GameWindow(tk.Tk):
     
     def create_action_panel(self):
         """Cria painel de ações lateral."""
-        self.action_panel = tk.Frame(self.main_frame, bg="#1a1a3a", width=200)
+        self.action_panel = tk.Frame(self.main_container, bg="#1a1a3a", width=220)
         self.action_panel.pack(side="right", fill="y", padx=5, pady=5)
         self.action_panel.pack_propagate(False)
         
+        # Título
         tk.Label(
             self.action_panel,
-            text="⚔️ ATRIBUTO",
-            font=("Georgia", 12, "bold"),
+            text="⚔️ ESCOLHA O ATRIBUTO",
+            font=("Georgia", 11, "bold"),
             bg="#1a1a3a",
             fg="#ffd700"
         ).pack(pady=10)
         
-        # Botões de atributos
+        # Frame para os botões de atributos
+        attr_frame = tk.Frame(self.action_panel, bg="#1a1a3a")
+        attr_frame.pack(fill="x", padx=10)
+        
+        # Botões de atributos com cores
         attrs = [
-            ("combat_power", "⚔️ Combate"),
-            ("wisdom", "📚 Sabedoria"),
-            ("justice", "⚖️ Justiça"),
-            ("eternity", "∞ Eternidade")
+            ("combat_power", "⚔️ COMBATE", "#ff6644"),
+            ("wisdom", "📚 SABEDORIA", "#4488ff"),
+            ("justice", "⚖️ JUSTIÇA", "#ffcc00"),
+            ("eternity", "∞ ETERNIDADE", "#aa44ff")
         ]
         
         self.attr_buttons = {}
-        for attr_key, attr_name in attrs:
+        self.attr_colors = {}
+        for attr_key, attr_name, color in attrs:
+            self.attr_colors[attr_key] = color
             btn = tk.Button(
-                self.action_panel,
+                attr_frame,
                 text=attr_name,
-                font=("Georgia", 10),
+                font=("Georgia", 11, "bold"),
                 bg="#2a2a4a",
                 fg="white",
-                width=15,
+                activebackground=color,
+                activeforeground="white",
+                width=18,
+                height=2,
+                cursor="hand2",
                 command=lambda a=attr_key: self.select_attribute(a)
             )
-            btn.pack(pady=3)
+            btn.pack(pady=5, fill="x")
             self.attr_buttons[attr_key] = btn
         
+        # Label mostrando seleção atual
+        self.selection_label = tk.Label(
+            self.action_panel,
+            text="Selecione carta e atributo",
+            font=("Georgia", 9),
+            bg="#1a1a3a",
+            fg="#888888",
+            wraplength=180
+        )
+        self.selection_label.pack(pady=10)
+        
         # Separador
-        tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=15)
+        tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=10, padx=10)
+        
+        # Botão de batalha
+        self.battle_button = tk.Button(
+            self.action_panel,
+            text="⚔️ BATALHAR! ⚔️",
+            font=("Georgia", 14, "bold"),
+            bg="#444444",
+            fg="#888888",
+            width=18,
+            height=2,
+            state="disabled",
+            cursor="arrow",
+            command=self.execute_battle
+        )
+        self.battle_button.pack(pady=10)
+        
+        # Separador
+        tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=10, padx=10)
         
         # Eventos
         tk.Label(
             self.action_panel,
-            text="🌩️ EVENTOS",
-            font=("Georgia", 12, "bold"),
+            text="🌩️ EVENTOS MITOLÓGICOS",
+            font=("Georgia", 10, "bold"),
             bg="#1a1a3a",
             fg="#ffd700"
         ).pack(pady=5)
@@ -430,6 +477,9 @@ class GameWindow(tk.Tk):
         )
         self.events_label.pack()
         
+        event_frame = tk.Frame(self.action_panel, bg="#1a1a3a")
+        event_frame.pack(fill="x", padx=10)
+        
         events = [
             ("ragnarok", "⚡ Ragnarök"),
             ("osiris", "⚖️ Julgamento"),
@@ -439,14 +489,26 @@ class GameWindow(tk.Tk):
         
         for event_key, event_name in events:
             tk.Button(
-                self.action_panel,
+                event_frame,
                 text=event_name,
                 font=("Georgia", 9),
                 bg="#2a4a4a",
                 fg="white",
-                width=15,
+                width=16,
+                cursor="hand2",
                 command=lambda e=event_key: self.use_event(e)
             ).pack(pady=2)
+        
+        # Botão voltar ao menu
+        tk.Button(
+            self.action_panel,
+            text="🏠 Menu Principal",
+            font=("Georgia", 10),
+            bg="#444444",
+            fg="white",
+            width=16,
+            command=self.show_main_menu
+        ).pack(side="bottom", pady=10)
         
         # Separador
         tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=15)
@@ -542,6 +604,7 @@ class GameWindow(tk.Tk):
         """Seleciona uma carta."""
         self.selected_card = card
         self.update_game_display()
+        self.update_selection_label()
         self.check_battle_ready()
         
         # Mostrar carta grande na área de batalha
@@ -564,12 +627,26 @@ class GameWindow(tk.Tk):
                 window=visual
             )
             
-            # Instruções
+            # Símbolo do deus e nome
+            symbol = DEITY_SYMBOLS.get(self.selected_card.name, "🏛️")
+            self.battle_canvas.create_text(
+                550, 50,
+                text=symbol,
+                font=("Segoe UI Emoji", 32)
+            )
+            
             self.battle_canvas.create_text(
                 550, 100,
-                text="Carta Selecionada!",
-                font=("Georgia", 16),
-                fill="#88ff88"
+                text=self.selected_card.current_name.upper(),
+                font=("Georgia", 18, "bold"),
+                fill="#ffd700"
+            )
+            
+            self.battle_canvas.create_text(
+                550, 125,
+                text=self.selected_card.current_pantheon.value,
+                font=("Georgia", 10, "italic"),
+                fill="#888888"
             )
             
             if self.selected_attribute:
@@ -580,7 +657,7 @@ class GameWindow(tk.Tk):
                     "eternity": "∞ Eternidade"
                 }
                 self.battle_canvas.create_text(
-                    550, 150,
+                    550, 170,
                     text=f"Atributo: {attr_names.get(self.selected_attribute, '')}",
                     font=("Georgia", 14),
                     fill="#ffd700"
@@ -588,40 +665,77 @@ class GameWindow(tk.Tk):
                 
                 value = self.selected_card.current_attributes.get_attribute(self.selected_attribute)
                 self.battle_canvas.create_text(
-                    550, 190,
+                    550, 210,
                     text=f"Valor: {value}",
-                    font=("Georgia", 24, "bold"),
-                    fill="#ffffff"
+                    font=("Georgia", 28, "bold"),
+                    fill="#00ff88"
                 )
             else:
                 self.battle_canvas.create_text(
                     550, 175,
-                    text="Selecione um atributo →",
-                    font=("Georgia", 14),
-                    fill="#666666"
+                    text="→ Escolha um atributo\n   no painel à direita",
+                    font=("Georgia", 12),
+                    fill="#666666",
+                    justify="center"
                 )
     
     def select_attribute(self, attribute: str):
         """Seleciona um atributo."""
         self.selected_attribute = attribute
         
-        # Atualizar botões
+        # Atualizar botões com cores temáticas
         for key, btn in self.attr_buttons.items():
             if key == attribute:
-                btn.config(bg="#00aa44")
+                btn.config(bg=self.attr_colors.get(key, "#00aa44"), fg="white")
             else:
-                btn.config(bg="#2a2a4a")
+                btn.config(bg="#2a2a4a", fg="white")
         
-        self.update_game_display()
+        self.update_selection_label()
         self.show_selected_card()
         self.check_battle_ready()
+    
+    def update_selection_label(self):
+        """Atualiza o label de seleção."""
+        if self.selected_card and self.selected_attribute:
+            attr_names = {
+                "combat_power": "Combate",
+                "wisdom": "Sabedoria",
+                "justice": "Justiça",
+                "eternity": "Eternidade"
+            }
+            value = self.selected_card.current_attributes.get_attribute(self.selected_attribute)
+            self.selection_label.config(
+                text=f"✅ {self.selected_card.current_name}\n{attr_names[self.selected_attribute]}: {value}",
+                fg="#00ff88"
+            )
+        elif self.selected_card:
+            self.selection_label.config(
+                text=f"✅ {self.selected_card.current_name}\n❌ Escolha um atributo",
+                fg="#ffcc00"
+            )
+        elif self.selected_attribute:
+            attr_names = {
+                "combat_power": "Combate",
+                "wisdom": "Sabedoria",
+                "justice": "Justiça",
+                "eternity": "Eternidade"
+            }
+            self.selection_label.config(
+                text=f"❌ Escolha uma carta\n✅ {attr_names[self.selected_attribute]}",
+                fg="#ffcc00"
+            )
+        else:
+            self.selection_label.config(
+                text="Selecione carta e atributo",
+                fg="#888888"
+            )
     
     def check_battle_ready(self):
         """Verifica se pode batalhar."""
         if self.selected_card and self.selected_attribute:
-            self.battle_button.config(state="normal", bg="#00aa44")
+            self.battle_button.config(state="normal", bg="#00aa44", fg="white", cursor="hand2")
         else:
-            self.battle_button.config(state="disabled", bg="#aa4400")
+            self.battle_button.config(state="disabled", bg="#444444", fg="#888888", cursor="arrow")
     
     def execute_battle(self):
         """Executa a batalha."""
