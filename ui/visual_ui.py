@@ -1,0 +1,914 @@
+"""
+Interface gráfica principal do jogo usando Tkinter.
+"""
+import tkinter as tk
+from tkinter import ttk, messagebox
+from typing import Optional, List
+import random
+
+from models.card import Card, Pantheon
+from models.events import EventType, create_event
+from game.game_state import GameState, GamePhase
+from game.player import Player
+from ui.visual_card import VisualCard, MiniCard, CardColors
+from ui.visual_events import (
+    RagnarokAnimation, OsirisJudgmentAnimation,
+    BifrostAnimation, MysteriesAnimation, BattleAnimation
+)
+
+
+class GameWindow(tk.Tk):
+    """Janela principal do jogo."""
+    
+    def __init__(self):
+        super().__init__()
+        
+        self.title("🏛️ Super Trunfo Mitológico")
+        self.geometry("1200x800")
+        self.configure(bg="#0a0a1a")
+        self.minsize(1000, 700)
+        
+        self.game_state: Optional[GameState] = None
+        self.selected_card: Optional[Card] = None
+        self.selected_attribute: Optional[str] = None
+        self.current_animation = None
+        
+        # Estilo
+        self.setup_styles()
+        
+        # Tela inicial
+        self.show_main_menu()
+    
+    def setup_styles(self):
+        """Configura estilos do ttk."""
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Botões
+        style.configure(
+            'Game.TButton',
+            font=('Georgia', 12),
+            padding=10,
+            background='#4a2c7a',
+            foreground='white'
+        )
+        
+        style.configure(
+            'Event.TButton',
+            font=('Georgia', 10),
+            padding=5,
+            background='#2a4a6a'
+        )
+        
+        # Labels
+        style.configure(
+            'Title.TLabel',
+            font=('Georgia', 24, 'bold'),
+            background='#0a0a1a',
+            foreground='#ffd700'
+        )
+        
+        style.configure(
+            'Info.TLabel',
+            font=('Georgia', 12),
+            background='#0a0a1a',
+            foreground='#cccccc'
+        )
+    
+    def clear_window(self):
+        """Remove todos os widgets da janela."""
+        for widget in self.winfo_children():
+            widget.destroy()
+    
+    def show_main_menu(self):
+        """Exibe o menu principal."""
+        self.clear_window()
+        
+        # Frame central
+        center_frame = tk.Frame(self, bg="#0a0a1a")
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+        
+        # Título
+        title_label = tk.Label(
+            center_frame,
+            text="🏛️ SUPER TRUNFO MITOLÓGICO 🏛️",
+            font=("Georgia", 36, "bold"),
+            bg="#0a0a1a",
+            fg="#ffd700"
+        )
+        title_label.pack(pady=20)
+        
+        # Subtítulo
+        subtitle = tk.Label(
+            center_frame,
+            text="Deuses de quatro panteões disputam a supremacia cósmica!",
+            font=("Georgia", 14, "italic"),
+            bg="#0a0a1a",
+            fg="#cccccc"
+        )
+        subtitle.pack(pady=10)
+        
+        # Símbolos dos panteões
+        symbols = tk.Label(
+            center_frame,
+            text="🏛️ Egípcio  ⚡ Nórdico  🏛️ Greco-Romano  🌙 Mesopotâmico",
+            font=("Segoe UI Emoji", 14),
+            bg="#0a0a1a",
+            fg="#888888"
+        )
+        symbols.pack(pady=20)
+        
+        # Botões
+        btn_frame = tk.Frame(center_frame, bg="#0a0a1a")
+        btn_frame.pack(pady=30)
+        
+        tk.Button(
+            btn_frame,
+            text="🎮 Novo Jogo",
+            font=("Georgia", 16),
+            bg="#4a2c7a",
+            fg="white",
+            width=20,
+            command=self.show_player_setup
+        ).pack(pady=10)
+        
+        tk.Button(
+            btn_frame,
+            text="📜 Regras",
+            font=("Georgia", 16),
+            bg="#2a4a6a",
+            fg="white",
+            width=20,
+            command=self.show_rules
+        ).pack(pady=10)
+        
+        tk.Button(
+            btn_frame,
+            text="🃏 Ver Cartas",
+            font=("Georgia", 16),
+            bg="#2a4a6a",
+            fg="white",
+            width=20,
+            command=self.show_card_gallery
+        ).pack(pady=10)
+        
+        tk.Button(
+            btn_frame,
+            text="❌ Sair",
+            font=("Georgia", 16),
+            bg="#4a2a2a",
+            fg="white",
+            width=20,
+            command=self.quit
+        ).pack(pady=10)
+    
+    def show_player_setup(self):
+        """Tela de configuração dos jogadores."""
+        self.clear_window()
+        
+        center_frame = tk.Frame(self, bg="#0a0a1a")
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+        
+        tk.Label(
+            center_frame,
+            text="⚙️ CONFIGURAÇÃO DO JOGO",
+            font=("Georgia", 28, "bold"),
+            bg="#0a0a1a",
+            fg="#ffd700"
+        ).pack(pady=20)
+        
+        # Jogador 1
+        tk.Label(
+            center_frame,
+            text="Nome do Jogador 1:",
+            font=("Georgia", 14),
+            bg="#0a0a1a",
+            fg="#cccccc"
+        ).pack(pady=5)
+        
+        self.player1_entry = tk.Entry(
+            center_frame,
+            font=("Georgia", 14),
+            width=30,
+            bg="#2a2a4a",
+            fg="white",
+            insertbackground="white"
+        )
+        self.player1_entry.insert(0, "Jogador 1")
+        self.player1_entry.pack(pady=5)
+        
+        # Jogador 2
+        tk.Label(
+            center_frame,
+            text="Nome do Jogador 2:",
+            font=("Georgia", 14),
+            bg="#0a0a1a",
+            fg="#cccccc"
+        ).pack(pady=5)
+        
+        self.player2_entry = tk.Entry(
+            center_frame,
+            font=("Georgia", 14),
+            width=30,
+            bg="#2a2a4a",
+            fg="white",
+            insertbackground="white"
+        )
+        self.player2_entry.insert(0, "Jogador 2")
+        self.player2_entry.pack(pady=5)
+        
+        # Botões
+        btn_frame = tk.Frame(center_frame, bg="#0a0a1a")
+        btn_frame.pack(pady=30)
+        
+        tk.Button(
+            btn_frame,
+            text="▶️ Iniciar Jogo",
+            font=("Georgia", 14),
+            bg="#00aa44",
+            fg="white",
+            width=15,
+            command=self.start_game
+        ).pack(side="left", padx=10)
+        
+        tk.Button(
+            btn_frame,
+            text="↩️ Voltar",
+            font=("Georgia", 14),
+            bg="#666666",
+            fg="white",
+            width=15,
+            command=self.show_main_menu
+        ).pack(side="left", padx=10)
+    
+    def start_game(self):
+        """Inicia o jogo."""
+        player1 = self.player1_entry.get() or "Jogador 1"
+        player2 = self.player2_entry.get() or "Jogador 2"
+        
+        self.game_state = GameState()
+        self.game_state.initialize_game([player1, player2])
+        
+        self.show_game_screen()
+    
+    def show_game_screen(self):
+        """Tela principal do jogo."""
+        self.clear_window()
+        
+        # Layout principal
+        self.main_frame = tk.Frame(self, bg="#0a0a1a")
+        self.main_frame.pack(fill="both", expand=True)
+        
+        # Área superior - informações
+        self.create_info_bar()
+        
+        # Área central - jogo
+        self.game_area = tk.Frame(self.main_frame, bg="#0a0a1a")
+        self.game_area.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Área do oponente (cartas viradas)
+        self.create_opponent_area()
+        
+        # Área central (batalha e eventos)
+        self.create_battle_area()
+        
+        # Área do jogador (mão)
+        self.create_player_area()
+        
+        # Painel lateral - ações
+        self.create_action_panel()
+        
+        self.update_game_display()
+    
+    def create_info_bar(self):
+        """Cria barra de informações."""
+        info_bar = tk.Frame(self.main_frame, bg="#1a1a3a", height=60)
+        info_bar.pack(fill="x", padx=10, pady=5)
+        info_bar.pack_propagate(False)
+        
+        # Turno
+        self.turn_label = tk.Label(
+            info_bar,
+            text="TURNO 1",
+            font=("Georgia", 16, "bold"),
+            bg="#1a1a3a",
+            fg="#ffd700"
+        )
+        self.turn_label.pack(side="left", padx=20)
+        
+        # Jogador atual
+        self.current_player_label = tk.Label(
+            info_bar,
+            text="Vez de: ---",
+            font=("Georgia", 14),
+            bg="#1a1a3a",
+            fg="#88ff88"
+        )
+        self.current_player_label.pack(side="left", padx=20)
+        
+        # Placar
+        self.score_label = tk.Label(
+            info_bar,
+            text="Placar: 0 x 0",
+            font=("Georgia", 14),
+            bg="#1a1a3a",
+            fg="#cccccc"
+        )
+        self.score_label.pack(side="right", padx=20)
+    
+    def create_opponent_area(self):
+        """Cria área do oponente."""
+        opponent_frame = tk.Frame(self.game_area, bg="#0a0a1a", height=120)
+        opponent_frame.pack(fill="x", pady=5)
+        
+        self.opponent_label = tk.Label(
+            opponent_frame,
+            text="Oponente",
+            font=("Georgia", 12),
+            bg="#0a0a1a",
+            fg="#ff8888"
+        )
+        self.opponent_label.pack()
+        
+        self.opponent_cards_frame = tk.Frame(opponent_frame, bg="#0a0a1a")
+        self.opponent_cards_frame.pack()
+    
+    def create_battle_area(self):
+        """Cria área de batalha central."""
+        self.battle_frame = tk.Frame(self.game_area, bg="#1a1a2a", height=350)
+        self.battle_frame.pack(fill="x", pady=10)
+        self.battle_frame.pack_propagate(False)
+        
+        # Canvas para animações
+        self.battle_canvas = tk.Canvas(
+            self.battle_frame,
+            bg="#1a1a2a",
+            highlightthickness=0
+        )
+        self.battle_canvas.pack(fill="both", expand=True)
+        
+        # Texto inicial
+        self.battle_canvas.create_text(
+            400, 150,
+            text="Selecione uma carta e um atributo para batalhar!",
+            font=("Georgia", 16),
+            fill="#666666",
+            tags="instruction"
+        )
+    
+    def create_player_area(self):
+        """Cria área do jogador."""
+        player_frame = tk.Frame(self.game_area, bg="#0a0a1a")
+        player_frame.pack(fill="x", pady=5)
+        
+        self.player_label = tk.Label(
+            player_frame,
+            text="Sua Mão",
+            font=("Georgia", 12),
+            bg="#0a0a1a",
+            fg="#88ff88"
+        )
+        self.player_label.pack()
+        
+        self.player_cards_frame = tk.Frame(player_frame, bg="#0a0a1a")
+        self.player_cards_frame.pack()
+    
+    def create_action_panel(self):
+        """Cria painel de ações lateral."""
+        self.action_panel = tk.Frame(self.main_frame, bg="#1a1a3a", width=200)
+        self.action_panel.pack(side="right", fill="y", padx=5, pady=5)
+        self.action_panel.pack_propagate(False)
+        
+        tk.Label(
+            self.action_panel,
+            text="⚔️ ATRIBUTO",
+            font=("Georgia", 12, "bold"),
+            bg="#1a1a3a",
+            fg="#ffd700"
+        ).pack(pady=10)
+        
+        # Botões de atributos
+        attrs = [
+            ("combat_power", "⚔️ Combate"),
+            ("wisdom", "📚 Sabedoria"),
+            ("justice", "⚖️ Justiça"),
+            ("eternity", "∞ Eternidade")
+        ]
+        
+        self.attr_buttons = {}
+        for attr_key, attr_name in attrs:
+            btn = tk.Button(
+                self.action_panel,
+                text=attr_name,
+                font=("Georgia", 10),
+                bg="#2a2a4a",
+                fg="white",
+                width=15,
+                command=lambda a=attr_key: self.select_attribute(a)
+            )
+            btn.pack(pady=3)
+            self.attr_buttons[attr_key] = btn
+        
+        # Separador
+        tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=15)
+        
+        # Eventos
+        tk.Label(
+            self.action_panel,
+            text="🌩️ EVENTOS",
+            font=("Georgia", 12, "bold"),
+            bg="#1a1a3a",
+            fg="#ffd700"
+        ).pack(pady=5)
+        
+        self.events_label = tk.Label(
+            self.action_panel,
+            text="Disponíveis: 2",
+            font=("Georgia", 9),
+            bg="#1a1a3a",
+            fg="#888888"
+        )
+        self.events_label.pack()
+        
+        events = [
+            ("ragnarok", "⚡ Ragnarök"),
+            ("osiris", "⚖️ Julgamento"),
+            ("bifrost", "🌈 Bifrost"),
+            ("mysteries", "🔮 Mistérios")
+        ]
+        
+        for event_key, event_name in events:
+            tk.Button(
+                self.action_panel,
+                text=event_name,
+                font=("Georgia", 9),
+                bg="#2a4a4a",
+                fg="white",
+                width=15,
+                command=lambda e=event_key: self.use_event(e)
+            ).pack(pady=2)
+        
+        # Separador
+        tk.Frame(self.action_panel, bg="#3a3a5a", height=2).pack(fill="x", pady=15)
+        
+        # Botão de batalha
+        self.battle_button = tk.Button(
+            self.action_panel,
+            text="⚔️ BATALHAR!",
+            font=("Georgia", 12, "bold"),
+            bg="#aa4400",
+            fg="white",
+            width=15,
+            state="disabled",
+            command=self.execute_battle
+        )
+        self.battle_button.pack(pady=10)
+        
+        # Botão voltar ao menu
+        tk.Button(
+            self.action_panel,
+            text="🏠 Menu",
+            font=("Georgia", 10),
+            bg="#444444",
+            fg="white",
+            width=15,
+            command=self.show_main_menu
+        ).pack(side="bottom", pady=10)
+    
+    def update_game_display(self):
+        """Atualiza toda a exibição do jogo."""
+        if not self.game_state:
+            return
+        
+        player = self.game_state.current_player
+        opponent = self.game_state.get_opponent(player.id)
+        
+        # Atualizar labels
+        self.turn_label.config(text=f"TURNO {self.game_state.turn_number}")
+        self.current_player_label.config(text=f"Vez de: {player.name}")
+        self.score_label.config(text=f"{player.name}: {player.score} | {opponent.name}: {opponent.score}")
+        self.player_label.config(text=f"Mão de {player.name}")
+        self.opponent_label.config(text=f"Cartas de {opponent.name}: {len(opponent.hand)}")
+        self.events_label.config(text=f"Disponíveis: {player.events_available}")
+        
+        # Atualizar cartas do jogador
+        for widget in self.player_cards_frame.winfo_children():
+            widget.destroy()
+        
+        for card in player.hand:
+            card_widget = self.create_clickable_card(card)
+            card_widget.pack(side="left", padx=5)
+        
+        # Atualizar cartas do oponente (viradas)
+        for widget in self.opponent_cards_frame.winfo_children():
+            widget.destroy()
+        
+        for card in opponent.hand:
+            mini_back = tk.Canvas(
+                self.opponent_cards_frame,
+                width=60, height=80,
+                bg="#2a2a4a",
+                highlightthickness=1,
+                highlightbackground="#4a4a6a"
+            )
+            mini_back.create_text(30, 40, text="🏛️", font=("Segoe UI Emoji", 20))
+            mini_back.pack(side="left", padx=2)
+        
+        # Verificar fim de jogo
+        if self.game_state.current_phase == GamePhase.GAME_OVER:
+            self.show_game_over()
+    
+    def create_clickable_card(self, card: Card) -> tk.Frame:
+        """Cria uma carta clicável."""
+        frame = tk.Frame(self.player_cards_frame, bg="#0a0a1a")
+        
+        visual_card = VisualCard(
+            frame, card,
+            width=140, height=200,
+            highlight_attr=self.selected_attribute
+        )
+        visual_card.pack()
+        
+        # Indicador de seleção
+        if self.selected_card and self.selected_card.card_id == card.card_id:
+            visual_card.config(highlightthickness=3, highlightbackground="#00ff00")
+        
+        # Clique para selecionar
+        visual_card.bind("<Button-1>", lambda e, c=card: self.select_card(c))
+        
+        return frame
+    
+    def select_card(self, card: Card):
+        """Seleciona uma carta."""
+        self.selected_card = card
+        self.update_game_display()
+        self.check_battle_ready()
+        
+        # Mostrar carta grande na área de batalha
+        self.show_selected_card()
+    
+    def show_selected_card(self):
+        """Mostra a carta selecionada na área de batalha."""
+        self.battle_canvas.delete("all")
+        
+        if self.selected_card:
+            # Carta grande
+            visual = VisualCard(
+                self.battle_canvas,
+                self.selected_card,
+                width=200, height=300,
+                highlight_attr=self.selected_attribute
+            )
+            self.battle_canvas.create_window(
+                200, 175,
+                window=visual
+            )
+            
+            # Instruções
+            self.battle_canvas.create_text(
+                550, 100,
+                text="Carta Selecionada!",
+                font=("Georgia", 16),
+                fill="#88ff88"
+            )
+            
+            if self.selected_attribute:
+                attr_names = {
+                    "combat_power": "⚔️ Combate",
+                    "wisdom": "📚 Sabedoria",
+                    "justice": "⚖️ Justiça",
+                    "eternity": "∞ Eternidade"
+                }
+                self.battle_canvas.create_text(
+                    550, 150,
+                    text=f"Atributo: {attr_names.get(self.selected_attribute, '')}",
+                    font=("Georgia", 14),
+                    fill="#ffd700"
+                )
+                
+                value = self.selected_card.current_attributes.get_attribute(self.selected_attribute)
+                self.battle_canvas.create_text(
+                    550, 190,
+                    text=f"Valor: {value}",
+                    font=("Georgia", 24, "bold"),
+                    fill="#ffffff"
+                )
+            else:
+                self.battle_canvas.create_text(
+                    550, 175,
+                    text="Selecione um atributo →",
+                    font=("Georgia", 14),
+                    fill="#666666"
+                )
+    
+    def select_attribute(self, attribute: str):
+        """Seleciona um atributo."""
+        self.selected_attribute = attribute
+        
+        # Atualizar botões
+        for key, btn in self.attr_buttons.items():
+            if key == attribute:
+                btn.config(bg="#00aa44")
+            else:
+                btn.config(bg="#2a2a4a")
+        
+        self.update_game_display()
+        self.show_selected_card()
+        self.check_battle_ready()
+    
+    def check_battle_ready(self):
+        """Verifica se pode batalhar."""
+        if self.selected_card and self.selected_attribute:
+            self.battle_button.config(state="normal", bg="#00aa44")
+        else:
+            self.battle_button.config(state="disabled", bg="#aa4400")
+    
+    def execute_battle(self):
+        """Executa a batalha."""
+        if not self.selected_card or not self.selected_attribute:
+            return
+        
+        player = self.game_state.current_player
+        opponent = self.game_state.get_opponent(player.id)
+        
+        # Oponente escolhe carta (primeira disponível)
+        opponent_card = opponent.hand[0]
+        
+        # Valores
+        player_value = self.selected_card.current_attributes.get_attribute(self.selected_attribute)
+        opponent_value = opponent_card.current_attributes.get_attribute(self.selected_attribute)
+        
+        # Determinar vencedor
+        result = self.selected_card.compare(opponent_card, self.selected_attribute)
+        
+        if result == 1:
+            winner = 1
+            player.win_card(self.selected_card)
+            player.win_card(opponent_card)
+            player.remove_card(self.selected_card)
+            opponent.remove_card(opponent_card)
+        elif result == -1:
+            winner = 2
+            opponent.win_card(self.selected_card)
+            opponent.win_card(opponent_card)
+            player.remove_card(self.selected_card)
+            opponent.remove_card(opponent_card)
+        else:
+            winner = 0
+        
+        # Animação
+        self.battle_canvas.delete("all")
+        anim = BattleAnimation(
+            self.battle_canvas,
+            self.selected_card.current_name,
+            opponent_card.current_name,
+            self.selected_attribute,
+            player_value,
+            opponent_value,
+            winner,
+            on_complete=self.after_battle
+        )
+        self.current_animation = anim
+        self.battle_canvas.update_idletasks()
+        anim.start()
+    
+    def after_battle(self):
+        """Chamado após a animação de batalha."""
+        self.current_animation = None
+        self.selected_card = None
+        self.selected_attribute = None
+        
+        # Resetar botões
+        for btn in self.attr_buttons.values():
+            btn.config(bg="#2a2a4a")
+        
+        self.game_state.end_turn()
+        self.update_game_display()
+    
+    def use_event(self, event_key: str):
+        """Usa um evento mitológico."""
+        player = self.game_state.current_player
+        
+        if player.events_available <= 0:
+            messagebox.showwarning("Evento", "Você não tem mais eventos disponíveis!")
+            return
+        
+        event_map = {
+            "ragnarok": EventType.RAGNAROK,
+            "osiris": EventType.OSIRIS_JUDGMENT,
+            "bifrost": EventType.BIFROST,
+            "mysteries": EventType.MYSTERIES
+        }
+        
+        event_type = event_map.get(event_key)
+        if not event_type:
+            return
+        
+        event = create_event(event_type)
+        
+        # Verificar se pode ativar
+        if not event.can_activate(self.game_state, player.id):
+            messagebox.showinfo("Evento", "Condições não satisfeitas para ativar este evento.")
+            return
+        
+        self.battle_canvas.delete("all")
+        self.battle_canvas.update_idletasks()
+        
+        # Executar evento com animação
+        if event_key == "ragnarok":
+            result = event.execute(self.game_state, player.id)
+            player.use_event()
+            anim = RagnarokAnimation(
+                self.battle_canvas,
+                on_complete=lambda: self.show_event_result(result)
+            )
+        
+        elif event_key == "osiris":
+            result = event.execute(self.game_state, player.id)
+            player.use_event()
+            passed = "passou" in result.message.lower()
+            justice = 50  # Default
+            anim = OsirisJudgmentAnimation(
+                self.battle_canvas,
+                passed=passed,
+                justice_value=justice,
+                on_complete=lambda: self.show_event_result(result)
+            )
+        
+        elif event_key == "bifrost":
+            result = event.execute(self.game_state, player.id)
+            player.use_event()
+            card_name = result.affected_cards[0] if result.affected_cards else "Desconhecido"
+            anim = BifrostAnimation(
+                self.battle_canvas,
+                card_name=card_name,
+                on_complete=lambda: self.show_event_result(result)
+            )
+        
+        elif event_key == "mysteries":
+            result = event.execute(self.game_state, player.id)
+            player.use_event()
+            num_protected = len(result.affected_cards)
+            anim = MysteriesAnimation(
+                self.battle_canvas,
+                num_protected=num_protected,
+                on_complete=lambda: self.show_event_result(result)
+            )
+        
+        self.current_animation = anim
+        anim.start()
+    
+    def show_event_result(self, result):
+        """Mostra resultado do evento."""
+        self.current_animation = None
+        messagebox.showinfo("Resultado do Evento", result.message)
+        self.update_game_display()
+    
+    def show_game_over(self):
+        """Mostra tela de fim de jogo."""
+        winner = self.game_state.get_winner()
+        
+        self.battle_canvas.delete("all")
+        
+        self.battle_canvas.create_text(
+            400, 100,
+            text="🏆 FIM DE JOGO 🏆",
+            font=("Georgia", 36, "bold"),
+            fill="#ffd700"
+        )
+        
+        self.battle_canvas.create_text(
+            400, 180,
+            text=f"Vencedor: {winner.name}!",
+            font=("Georgia", 28),
+            fill="#00ff88"
+        )
+        
+        self.battle_canvas.create_text(
+            400, 240,
+            text=f"Pontuação: {winner.score}",
+            font=("Georgia", 20),
+            fill="#ffffff"
+        )
+        
+        # Botão para voltar ao menu
+        btn = tk.Button(
+            self.battle_canvas,
+            text="🏠 Voltar ao Menu",
+            font=("Georgia", 14),
+            bg="#4a2c7a",
+            fg="white",
+            command=self.show_main_menu
+        )
+        self.battle_canvas.create_window(400, 320, window=btn)
+    
+    def show_rules(self):
+        """Mostra janela de regras."""
+        rules_window = tk.Toplevel(self)
+        rules_window.title("📜 Regras do Jogo")
+        rules_window.geometry("600x500")
+        rules_window.configure(bg="#1a1a2e")
+        
+        text = tk.Text(
+            rules_window,
+            font=("Georgia", 11),
+            bg="#1a1a2e",
+            fg="#cccccc",
+            wrap="word",
+            padx=20,
+            pady=20
+        )
+        text.pack(fill="both", expand=True)
+        
+        rules = """
+🎮 OBJETIVO
+Ganhar todas as cartas dos oponentes ou ter mais pontos quando as cartas acabarem.
+
+⚔️ ATRIBUTOS DAS CARTAS
+• Poder de Combate - Força em batalha
+• Sabedoria - Conhecimento e estratégia  
+• Justiça - Retidão moral (importante no Julgamento de Osíris)
+• Eternidade - Imortalidade (gregos = alta, nórdicos = baixa)
+
+🔄 SINCRETISMO
+Cartas podem ser transformadas em suas versões equivalentes de outros panteões para ganhar bônus de atributos!
+
+Exemplo: Zeus → Júpiter (+10 Justiça) ou Amon-Rá (+15 Sabedoria)
+
+⚡ EVENTOS MITOLÓGICOS
+
+• Ragnarök - Destrói todas as cartas em jogo e redistribui novas
+
+• Julgamento de Osíris - O coração da carta é pesado contra a Pena da Verdade. Se Justiça < 50, a carta é devorada por Ammit!
+
+• Bifrost - A ponte arco-íris permite invocar uma carta da reserva
+
+• Mistérios de Ísis/Orfeu - Protege suas cartas por 3 rodadas
+
+⭐ SUPER TRUNFO
+Zeus é o Super Trunfo e vence qualquer carta!
+
+🏛️ PANTEÕES
+• Egípcio - Bônus: +10 Eternidade, +5 Justiça
+• Nórdico - Bônus: +10 Combate, -5 Sabedoria
+• Greco-Romano - Bônus: +5 Sabedoria, +5 Eternidade
+• Mesopotâmico - Bônus: +10 Justiça, +5 Sabedoria
+        """
+        
+        text.insert("1.0", rules)
+        text.config(state="disabled")
+    
+    def show_card_gallery(self):
+        """Mostra galeria de todas as cartas."""
+        from data.deck_data import create_deck
+        
+        gallery = tk.Toplevel(self)
+        gallery.title("🃏 Galeria de Cartas")
+        gallery.geometry("1000x700")
+        gallery.configure(bg="#0a0a1a")
+        
+        # Canvas com scroll
+        canvas = tk.Canvas(gallery, bg="#0a0a1a", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(gallery, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#0a0a1a")
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Adicionar cartas
+        deck = create_deck()
+        row = 0
+        col = 0
+        
+        for card in deck:
+            frame = tk.Frame(scrollable_frame, bg="#0a0a1a")
+            frame.grid(row=row, column=col, padx=10, pady=10)
+            
+            visual = VisualCard(frame, card, width=160, height=240)
+            visual.pack()
+            
+            col += 1
+            if col >= 5:
+                col = 0
+                row += 1
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Scroll com mouse
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+
+
+def run_visual_game():
+    """Inicia o jogo visual."""
+    app = GameWindow()
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    run_visual_game()
