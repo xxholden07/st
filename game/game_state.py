@@ -68,21 +68,20 @@ class GameState:
         )
     
     def _distribute_cards(self):
-        """Distribui as cartas igualmente entre os jogadores."""
-        cards_per_player = len(self.deck) // len(self.players)
-        reserve_cards = 2  # Cartas que vão para a reserva (Midgard)
+        """Distribui 7 cartas aleatórias para cada jogador."""
+        cards_per_player = 7  # 7 cartas por jogador
+        
+        # Garante que o deck está embaralhado
+        random.shuffle(self.deck)
         
         for i, player in enumerate(self.players):
             start = i * cards_per_player
             end = start + cards_per_player
             player_cards = self.deck[start:end]
             
-            # Algumas vão para reserva, resto para mão
-            for j, card in enumerate(player_cards):
-                if j < reserve_cards:
-                    player.add_to_reserve(card)
-                else:
-                    player.add_card(card)
+            # Todas as cartas vão para a mão
+            for card in player_cards:
+                player.add_card(card)
     
     def redistribute_cards(self):
         """Redistribui cartas após Ragnarök."""

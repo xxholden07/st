@@ -2,7 +2,7 @@
 Interface gráfica principal do jogo usando Tkinter.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from typing import Optional, List
 import random
 
@@ -17,6 +17,7 @@ from ui.visual_events import (
 )
 from ui.image_loader import get_image_loader
 from data.deity_lore import get_deity_lore, PANTHEON_INTRODUCTIONS
+from data.ranking import get_ranking_system
 
 
 class GameWindow(tk.Tk):
@@ -126,6 +127,16 @@ class GameWindow(tk.Tk):
             fg="white",
             width=20,
             command=self.show_player_setup
+        ).pack(pady=10)
+        
+        tk.Button(
+            btn_frame,
+            text="Ranking",
+            font=("Georgia", 16),
+            bg="#7a5a2a",
+            fg="white",
+            width=20,
+            command=self.show_ranking
         ).pack(pady=10)
         
         tk.Button(
@@ -245,6 +256,10 @@ class GameWindow(tk.Tk):
         # Pré-carrega as imagens (opcional, melhora performance)
         print("Carregando sprites dos personagens...")
         self.image_loader.preload_arena()
+        
+        # Reseta pontuação da sessão do ranking
+        ranking = get_ranking_system()
+        ranking.reset_session()
         
         self.game_state = GameState()
         self.game_state.initialize_game([player1, player2])
@@ -660,7 +675,7 @@ class GameWindow(tk.Tk):
         
         for card in opponent.hand:
             # Carrega a imagem do verso em tamanho mini
-            back_img = self.image_loader.get_card_back(width=50, height=70)
+            back_img = self.image_loader.get_card_back(width=70, height=100)
             
             if back_img:
                 # Usa a imagem do verso
@@ -676,17 +691,17 @@ class GameWindow(tk.Tk):
                 # Fallback: desenho simples se imagem não existir
                 mini_back = tk.Canvas(
                     self.opponent_cards_frame,
-                    width=50, height=70,
+                    width=70, height=100,
                     bg="#0a0a1a",
                     highlightthickness=2,
                     highlightbackground="#4a3a6a"
                 )
-                mini_back.create_rectangle(5, 5, 45, 65, fill="#1a1a2e", outline="#3a2a5a", width=2)
-                mini_back.create_oval(15, 25, 35, 45, fill="", outline="#4a3a6a", width=2)
-                mini_back.create_oval(20, 30, 30, 40, fill="#2a2a4a", outline="#5a4a7a", width=1)
-                mini_back.create_text(25, 55, text="ST", font=("Georgia", 7, "bold"), fill="#5a4a7a")
+                mini_back.create_rectangle(5, 5, 65, 95, fill="#1a1a2e", outline="#3a2a5a", width=2)
+                mini_back.create_oval(20, 35, 50, 65, fill="", outline="#4a3a6a", width=2)
+                mini_back.create_oval(28, 43, 42, 57, fill="#2a2a4a", outline="#5a4a7a", width=1)
+                mini_back.create_text(35, 80, text="ST", font=("Georgia", 9, "bold"), fill="#5a4a7a")
             
-            mini_back.pack(side="left", padx=2)
+            mini_back.pack(side="left", padx=3)
         
         # Verificar fim de jogo
         if self.game_state.current_phase == GamePhase.GAME_OVER:
@@ -698,7 +713,7 @@ class GameWindow(tk.Tk):
         
         visual_card = VisualCard(
             frame, card,
-            width=140, height=200,
+            width=160, height=240,
             highlight_attr=self.selected_attribute
         )
         visual_card.pack()
@@ -849,6 +864,7 @@ class GameWindow(tk.Tk):
         
         player = self.game_state.current_player
         opponent = self.game_state.get_opponent(player.id)
+        ranking = get_ranking_system()
         
         # Oponente escolhe carta (primeira disponível)
         opponent_card = opponent.hand[0]
@@ -856,6 +872,10 @@ class GameWindow(tk.Tk):
         # Valores
         player_value = self.selected_card.current_attributes.get_attribute(self.selected_attribute)
         opponent_value = opponent_card.current_attributes.get_attribute(self.selected_attribute)
+        
+        # Verifica se usou sincretismo ou super trunfo
+        used_syncretism = self.selected_card.current_pantheon != self.selected_card.pantheon
+        used_super_trump = self.selected_card.is_super_trump
         
         # Determinar vencedor
         result = self.selected_card.compare(opponent_card, self.selected_attribute)
@@ -866,12 +886,19 @@ class GameWindow(tk.Tk):
             player.win_card(opponent_card)
             player.remove_card(self.selected_card)
             opponent.remove_card(opponent_card)
+            
+            # Registra pontuação no ranking
+            ranking.record_battle_win(used_super_trump=used_super_trump, used_syncretism=used_syncretism)
+            
         elif result == -1:
             winner = 2
             opponent.win_card(self.selected_card)
             opponent.win_card(opponent_card)
             player.remove_card(self.selected_card)
             opponent.remove_card(opponent_card)
+            
+            # Registra derrota
+            ranking.record_battle_loss()
         else:
             winner = 0
         
@@ -1281,6 +1308,7 @@ class GameWindow(tk.Tk):
     def use_event(self, event_key: str):
         """Usa um evento mitológico."""
         player = self.game_state.current_player
+        ranking = get_ranking_system()
         
         if player.events_available <= 0:
             messagebox.showwarning("Evento", "Você não tem mais eventos disponíveis!")
@@ -1303,6 +1331,9 @@ class GameWindow(tk.Tk):
         if not event.can_activate(self.game_state, player.id):
             messagebox.showinfo("Evento", "Condições não satisfeitas para ativar este evento.")
             return
+        
+        # Registra pontos por usar evento
+        ranking.record_event_used()
         
         self.battle_canvas.delete("all")
         self.battle_canvas.update_idletasks()
@@ -1358,42 +1389,321 @@ class GameWindow(tk.Tk):
         self.update_game_display()
     
     def show_game_over(self):
-        """Mostra tela de fim de jogo."""
+        """Mostra tela de fim de jogo com sistema de ranking arcade."""
         winner = self.game_state.get_winner()
+        ranking = get_ranking_system()
+        
+        # Registra vitória do jogo se o jogador humano ganhou
+        player = self.game_state.players[0]  # Jogador 1 é o humano
+        is_player_winner = (winner.id == player.id)
+        
+        if is_player_winner:
+            ranking.record_game_won()
+        
+        # Pega resumo da sessão
+        summary = ranking.get_session_summary()
         
         self.battle_canvas.delete("all")
         
+        # Título estilo arcade
         self.battle_canvas.create_text(
-            400, 100,
-            text="🏆 FIM DE JOGO 🏆",
-            font=("Georgia", 36, "bold"),
+            400, 50,
+            text="GAME OVER",
+            font=("Courier", 42, "bold"),
+            fill="#ffd700"
+        )
+        
+        # Vencedor
+        winner_color = "#00ff88" if is_player_winner else "#ff4444"
+        self.battle_canvas.create_text(
+            400, 110,
+            text=f"{'VICTORY!' if is_player_winner else 'DEFEAT'}",
+            font=("Courier", 28, "bold"),
+            fill=winner_color
+        )
+        
+        self.battle_canvas.create_text(
+            400, 150,
+            text=f"Vencedor: {winner.name}",
+            font=("Georgia", 18),
+            fill="#ffffff"
+        )
+        
+        # Pontuação estilo arcade
+        self.battle_canvas.create_rectangle(250, 175, 550, 320, fill="#1a1a3a", outline="#4a4a8a", width=2)
+        
+        self.battle_canvas.create_text(
+            400, 195,
+            text="SCORE",
+            font=("Courier", 16, "bold"),
             fill="#ffd700"
         )
         
         self.battle_canvas.create_text(
-            400, 180,
-            text=f"Vencedor: {winner.name}!",
-            font=("Georgia", 28),
-            fill="#00ff88"
+            400, 230,
+            text=f"{summary['score']:,}",
+            font=("Courier", 36, "bold"),
+            fill="#00ffff"
         )
         
+        # Título conquistado
         self.battle_canvas.create_text(
-            400, 240,
-            text=f"Pontuação: {winner.score}",
-            font=("Georgia", 20),
-            fill="#ffffff"
+            400, 275,
+            text=summary['title'],
+            font=("Courier", 14, "bold"),
+            fill=summary['title_color']
         )
         
-        # Botão para voltar ao menu
-        btn = tk.Button(
+        # Estatísticas
+        stats_y = 300
+        self.battle_canvas.create_text(
+            400, stats_y + 30,
+            text=f"Vitórias: {summary['wins']} | Derrotas: {summary['losses']} | Taxa: {summary['win_rate']:.0f}%",
+            font=("Georgia", 11),
+            fill="#aaaaaa"
+        )
+        
+        # Verifica se é high score
+        if summary['is_high_score'] and is_player_winner:
+            self.battle_canvas.create_text(
+                400, stats_y + 60,
+                text="★ NEW HIGH SCORE! ★",
+                font=("Courier", 18, "bold"),
+                fill="#ffff00"
+            )
+            
+            # Botão para registrar no ranking
+            enter_btn = tk.Button(
+                self.battle_canvas,
+                text="ENTER NAME",
+                font=("Courier", 12, "bold"),
+                bg="#ffd700",
+                fg="#000000",
+                command=lambda: self._enter_ranking_name(summary['score'])
+            )
+            self.battle_canvas.create_window(400, stats_y + 100, window=enter_btn)
+        
+        # Botões
+        btn_y = stats_y + 140
+        
+        view_ranking_btn = tk.Button(
             self.battle_canvas,
-            text="Voltar ao Menu",
-            font=("Georgia", 14),
+            text="VER RANKING",
+            font=("Courier", 12, "bold"),
+            bg="#7a5a2a",
+            fg="white",
+            width=15,
+            command=self.show_ranking
+        )
+        self.battle_canvas.create_window(300, btn_y, window=view_ranking_btn)
+        
+        menu_btn = tk.Button(
+            self.battle_canvas,
+            text="MENU",
+            font=("Courier", 12, "bold"),
             bg="#4a2c7a",
             fg="white",
+            width=15,
             command=self.show_main_menu
         )
-        self.battle_canvas.create_window(400, 320, window=btn)
+        self.battle_canvas.create_window(500, btn_y, window=menu_btn)
+    
+    def _enter_ranking_name(self, score: int):
+        """Janela para inserir nome no ranking."""
+        name = simpledialog.askstring(
+            "HIGH SCORE!",
+            "Digite seu nome (máx 10 caracteres):",
+            parent=self
+        )
+        
+        if name:
+            ranking = get_ranking_system()
+            position, is_record = ranking.submit_score(name)
+            
+            if position > 0:
+                msg = f"Parabéns! Você ficou em {position}º lugar!"
+                if is_record:
+                    msg = "NOVO RECORDE! " + msg
+                messagebox.showinfo("Ranking", msg)
+                self.show_ranking()
+    
+    def show_ranking(self):
+        """Mostra a tabela de ranking estilo arcade."""
+        ranking_window = tk.Toplevel(self)
+        ranking_window.title("RANKING - HALL OF FAME")
+        ranking_window.geometry("700x600")
+        ranking_window.configure(bg="#0a0a1a")
+        ranking_window.transient(self)
+        ranking_window.grab_set()
+        
+        # Título estilo arcade
+        title_frame = tk.Frame(ranking_window, bg="#0a0a1a")
+        title_frame.pack(fill="x", pady=20)
+        
+        tk.Label(
+            title_frame,
+            text="★ HALL OF FAME ★",
+            font=("Courier", 32, "bold"),
+            bg="#0a0a1a",
+            fg="#ffd700"
+        ).pack()
+        
+        tk.Label(
+            title_frame,
+            text="TOP 10 DEUSES SUPREMOS",
+            font=("Courier", 14),
+            bg="#0a0a1a",
+            fg="#888888"
+        ).pack()
+        
+        # Tabela de ranking
+        table_frame = tk.Frame(ranking_window, bg="#1a1a3a", padx=20, pady=15)
+        table_frame.pack(fill="both", expand=True, padx=30, pady=10)
+        
+        # Cabeçalho
+        header_frame = tk.Frame(table_frame, bg="#2a2a5a")
+        header_frame.pack(fill="x", pady=(0, 10))
+        
+        headers = [("POS", 50), ("NOME", 120), ("SCORE", 100), ("VITORIAS", 80), ("TAXA", 60), ("DATA", 100)]
+        for text, width in headers:
+            tk.Label(
+                header_frame,
+                text=text,
+                font=("Courier", 11, "bold"),
+                bg="#2a2a5a",
+                fg="#ffd700",
+                width=width//10
+            ).pack(side="left", padx=5, pady=5)
+        
+        # Entradas do ranking
+        ranking = get_ranking_system()
+        entries = ranking.get_ranking()
+        
+        if not entries:
+            tk.Label(
+                table_frame,
+                text="Nenhum recorde registrado ainda!",
+                font=("Georgia", 14),
+                bg="#1a1a3a",
+                fg="#888888"
+            ).pack(pady=50)
+        else:
+            for i, entry in enumerate(entries):
+                pos = i + 1
+                
+                # Cores especiais para top 3
+                if pos == 1:
+                    bg_color = "#3a3a1a"
+                    text_color = "#ffd700"
+                    pos_text = "1ST"
+                elif pos == 2:
+                    bg_color = "#2a2a2a"
+                    text_color = "#c0c0c0"
+                    pos_text = "2ND"
+                elif pos == 3:
+                    bg_color = "#2a1a1a"
+                    text_color = "#cd7f32"
+                    pos_text = "3RD"
+                else:
+                    bg_color = "#1a1a3a"
+                    text_color = "#ffffff"
+                    pos_text = f"{pos}TH"
+                
+                entry_frame = tk.Frame(table_frame, bg=bg_color)
+                entry_frame.pack(fill="x", pady=2)
+                
+                # Posição
+                tk.Label(
+                    entry_frame,
+                    text=pos_text,
+                    font=("Courier", 12, "bold"),
+                    bg=bg_color,
+                    fg=text_color,
+                    width=5
+                ).pack(side="left", padx=5, pady=5)
+                
+                # Nome
+                tk.Label(
+                    entry_frame,
+                    text=entry.name,
+                    font=("Courier", 12, "bold"),
+                    bg=bg_color,
+                    fg=text_color,
+                    width=12,
+                    anchor="w"
+                ).pack(side="left", padx=5)
+                
+                # Score
+                tk.Label(
+                    entry_frame,
+                    text=f"{entry.total_score:,}",
+                    font=("Courier", 12),
+                    bg=bg_color,
+                    fg="#00ffff",
+                    width=10
+                ).pack(side="left", padx=5)
+                
+                # Vitórias
+                tk.Label(
+                    entry_frame,
+                    text=str(entry.wins),
+                    font=("Courier", 12),
+                    bg=bg_color,
+                    fg="#88ff88",
+                    width=8
+                ).pack(side="left", padx=5)
+                
+                # Taxa de vitória
+                tk.Label(
+                    entry_frame,
+                    text=f"{entry.win_rate:.0f}%",
+                    font=("Courier", 12),
+                    bg=bg_color,
+                    fg="#ffff88",
+                    width=6
+                ).pack(side="left", padx=5)
+                
+                # Data
+                tk.Label(
+                    entry_frame,
+                    text=entry.date,
+                    font=("Courier", 10),
+                    bg=bg_color,
+                    fg="#888888",
+                    width=10
+                ).pack(side="left", padx=5)
+        
+        # Legenda de títulos
+        legend_frame = tk.Frame(ranking_window, bg="#0a0a1a")
+        legend_frame.pack(fill="x", padx=30, pady=10)
+        
+        tk.Label(
+            legend_frame,
+            text="TÍTULOS:",
+            font=("Courier", 10, "bold"),
+            bg="#0a0a1a",
+            fg="#888888"
+        ).pack(anchor="w")
+        
+        titles_text = "10000+ DEUS SUPREMO | 7500+ DIVINDADE MAIOR | 5000+ SENHOR DOS PANTEÕES | 2500+ GUERREIRO DIVINO"
+        tk.Label(
+            legend_frame,
+            text=titles_text,
+            font=("Courier", 8),
+            bg="#0a0a1a",
+            fg="#666666"
+        ).pack(anchor="w")
+        
+        # Botão fechar
+        tk.Button(
+            ranking_window,
+            text="FECHAR",
+            font=("Courier", 12, "bold"),
+            bg="#4a2c7a",
+            fg="white",
+            width=15,
+            command=ranking_window.destroy
+        ).pack(pady=15)
     
     def show_rules(self):
         """Mostra janela de regras."""
