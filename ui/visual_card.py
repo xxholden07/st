@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Optional
 from models.card import Card, Pantheon
+from ui.image_loader import get_image_loader
 
 
 class CardColors:
@@ -125,6 +126,8 @@ class VisualCard(tk.Canvas):
         self.show_back = show_back
         self.highlight_attr = highlight_attr
         self.animation_id = None
+        self.image_loader = get_image_loader()
+        self.card_image_ref = None  # Para manter referência da imagem
         
         self.draw_card()
     
@@ -145,38 +148,106 @@ class VisualCard(tk.Canvas):
             self.draw_card_front()
     
     def draw_card_back(self):
-        """Desenha o verso da carta."""
-        # Fundo
-        self.create_rectangle(
-            5, 5, self.card_width - 5, self.card_height - 5,
-            fill="#2a2a4a", outline="#4a4a6a", width=3
+        """Desenha o verso da carta usando a imagem verso.png."""
+        # Tenta carregar a imagem do verso
+        back_img = self.image_loader.get_card_back(
+            width=self.card_width,
+            height=self.card_height
         )
         
-        # Padrão decorativo
-        for i in range(5, self.card_height - 5, 20):
-            self.create_line(
-                10, i, self.card_width - 10, i,
-                fill="#3a3a5a", width=1
+        if back_img:
+            # Usa a imagem do verso
+            self.card_back_ref = back_img  # Mantém referência
+            self.create_image(
+                self.card_width // 2,
+                self.card_height // 2,
+                image=back_img,
+                anchor="center"
             )
-        
-        # Símbolo central
-        self.create_text(
-            self.card_width // 2, self.card_height // 2,
-            text="🏛️",
-            font=("Segoe UI Emoji", 48)
-        )
-        
-        # Texto
-        self.create_text(
-            self.card_width // 2, self.card_height // 2 + 60,
-            text="MITOLOGIA",
-            font=("Georgia", 14, "bold"),
-            fill="#6a6a8a"
-        )
+        else:
+            # Fallback: desenho geométrico se imagem não existir
+            self.create_rectangle(
+                0, 0, self.card_width, self.card_height,
+                fill="#0a0a1a", outline="#3a2a5a", width=4
+            )
+            
+            cx = self.card_width // 2
+            cy = self.card_height // 2
+            
+            # Círculos concêntricos
+            for r in [60, 50, 40, 30]:
+                self.create_oval(
+                    cx - r, cy - r, cx + r, cy + r,
+                    fill="", outline="#4a3a6a", width=2
+                )
+            
+            self.create_text(
+                cx, cy - 80,
+                text="SUPER TRUNFO",
+                font=("Georgia", 12, "bold"),
+                fill="#6a5a8a"
+            )
+            self.create_text(
+                cx, cy + 80,
+                text="MITOLÓGICO",
+                font=("Georgia", 12, "bold"),
+                fill="#6a5a8a"
+            )
     
     def draw_card_front(self):
         """Desenha a frente da carta."""
         colors = self.get_colors()
+        
+        # Fundo
+        self.create_rectangle(
+            0, 0, self.card_width, self.card_height,
+            fill=colors["bg"], outline=""
+        )
+        
+        # Imagem do personagem - usa imagem sincretizada se ativo
+        img_width = self.card_width - 10
+        img_height = int(self.card_height * 0.65)
+        
+        # Verifica se sincretismo está ativo (panteão diferente do original)
+        if self.card.current_pantheon != self.card.pantheon:
+            # Usa a imagem baseada no nome atual (sincretizado)
+            current_name = self.card.current_name
+            pantheon_name = self.card.current_pantheon.value if self.card.current_pantheon else None
+            card_img = self.image_loader.get_card_image_by_name(
+                current_name,
+                width=img_width,
+                height=img_height,
+                pantheon_name=pantheon_name
+            )
+            # Se não encontrar imagem do sincretismo, usa a original com overlay
+            if not card_img:
+                card_img = self.image_loader.get_card_image(
+                    self.card.card_id,
+                    width=img_width,
+                    height=img_height
+                )
+        else:
+            # Imagem normal (sem sincretismo)
+            card_img = self.image_loader.get_card_image(
+                self.card.card_id, 
+                width=img_width,
+                height=img_height
+            )
+        
+        if card_img:
+            self.card_image_ref = card_img
+            self.create_image(
+                self.card_width // 2, 5,
+                image=card_img,
+                anchor="n"
+            )
+        
+        # Área de informações na parte inferior
+        info_y = int(self.card_height * 0.65)
+        self.create_rectangle(
+            0, info_y, self.card_width, self.card_height,
+            fill=colors["bg"], outline=""
+        )
         
         # Borda externa (glow para Super Trunfo ou protegida)
         if self.card.is_super_trump:
@@ -184,39 +255,17 @@ class VisualCard(tk.Canvas):
         elif self.card.is_protected:
             self.draw_glow_border(CardColors.PROTECTED_GLOW)
         
-        # Fundo principal com gradiente simulado
-        self.create_rectangle(
-            8, 8, self.card_width - 8, self.card_height // 3,
-            fill=colors["gradient_top"], outline=""
-        )
-        self.create_rectangle(
-            8, self.card_height // 3, self.card_width - 8, self.card_height - 8,
-            fill=colors["bg"], outline=""
-        )
-        
         # Borda principal
         self.create_rectangle(
-            5, 5, self.card_width - 5, self.card_height - 5,
+            2, 2, self.card_width - 2, self.card_height - 2,
             fill="", outline=colors["border"], width=3
         )
         
-        # Área do ID e grupo
+        # ID no canto
         self.draw_card_id(colors)
         
-        # Nome da divindade
-        self.draw_deity_name(colors)
-        
-        # Símbolo do panteão
-        self.draw_pantheon_symbol(colors)
-        
-        # Linha divisória decorativa
-        self.create_line(
-            20, 120, self.card_width - 20, 120,
-            fill=colors["accent"], width=2
-        )
-        
-        # Atributos
-        self.draw_attributes(colors)
+        # Nome e atributos
+        self.draw_deity_info(colors, info_y)
         
         # Indicadores especiais
         self.draw_special_indicators(colors)
@@ -237,151 +286,69 @@ class VisualCard(tk.Canvas):
     
     def draw_card_id(self, colors: dict):
         """Desenha o ID da carta."""
-        # Fundo do ID
-        self.create_oval(
-            10, 10, 50, 50,
-            fill=colors["accent"], outline=colors["border"], width=2
+        # Fundo do ID com transparência simulada
+        self.create_rectangle(
+            5, 5, 45, 35,
+            fill="#000000", outline=colors["border"], width=2
         )
         
         # Texto do ID
         self.create_text(
-            30, 30,
+            25, 20,
             text=self.card.card_id,
-            font=("Georgia", 14, "bold"),
-            fill=colors["bg"]
+            font=("Georgia", 12, "bold"),
+            fill=colors["fg"]
         )
     
-    def draw_deity_name(self, colors: dict):
-        """Desenha o nome e ilustração da divindade."""
-        # Ilustração do deus (símbolo emoji)
-        symbol = DEITY_SYMBOLS.get(self.card.name, "🏛️")
-        
-        # Círculo decorativo para o símbolo
-        cx = self.card_width // 2
-        cy = 55
-        radius = min(25, self.card_width // 8)
-        
-        # Fundo circular
-        self.create_oval(
-            cx - radius - 3, cy - radius - 3,
-            cx + radius + 3, cy + radius + 3,
-            fill="", outline=colors["accent"], width=2
-        )
-        self.create_oval(
-            cx - radius, cy - radius,
-            cx + radius, cy + radius,
-            fill=colors["bg"], outline=colors["border"], width=1
-        )
-        
-        # Símbolo do deus
-        font_size = max(12, min(18, self.card_width // 12))
-        self.create_text(
-            cx, cy,
-            text=symbol,
-            font=("Segoe UI Emoji", font_size)
-        )
-        
+    def draw_deity_info(self, colors: dict, start_y: int):
+        """Desenha informações da divindade na parte inferior."""
         # Nome da divindade
         name = self.card.current_name
-        font_size = 14 if len(name) < 10 else 11
-        if self.card_width < 150:
-            font_size = max(8, font_size - 3)
+        font_size = 13 if len(name) < 10 else 10
         
         self.create_text(
-            self.card_width // 2, 90,
+            self.card_width // 2, start_y + 10,
             text=name.upper(),
             font=("Georgia", font_size, "bold"),
             fill=colors["fg"]
         )
         
         # Panteão
-        pantheon_size = 9 if self.card_width >= 150 else 7
         self.create_text(
-            self.card_width // 2, 107,
+            self.card_width // 2, start_y + 28,
             text=self.card.current_pantheon.value,
-            font=("Georgia", pantheon_size, "italic"),
+            font=("Georgia", 8, "italic"),
             fill=colors["accent"]
         )
-    
-    def draw_pantheon_symbol(self, colors: dict):
-        """Desenha o símbolo do panteão."""
-        symbol = self.PANTHEON_SYMBOLS.get(self.card.current_pantheon, "⚡")
         
-        self.create_text(
-            self.card_width - 35, 30,
-            text=symbol,
-            font=("Segoe UI Symbol", 24),
-            fill=colors["fg"]
-        )
-    
-    def draw_attributes(self, colors: dict):
-        """Desenha os atributos da carta."""
+        # Atributos compactos
         attrs = self.card.current_attributes
-        attr_data = [
-            ("combat_power", "COMBATE", attrs.combat_power),
-            ("wisdom", "SABEDORIA", attrs.wisdom),
-            ("justice", "JUSTIÇA", attrs.justice),
-            ("eternity", "ETERNIDADE", attrs.eternity)
-        ]
+        attr_y = start_y + 45
+        attr_labels = [("CMB", attrs.combat_power), ("SAB", attrs.wisdom),
+                       ("JUS", attrs.justice), ("ETR", attrs.eternity)]
         
-        y_start = 140
-        y_spacing = 38
-        
-        for i, (key, label, value) in enumerate(attr_data):
-            y = y_start + i * y_spacing
+        for i, (label, value) in enumerate(attr_labels):
+            x = 15 + i * (self.card_width - 30) // 4
             
-            # Destacar atributo selecionado
-            is_highlighted = self.highlight_attr == key
-            
-            if is_highlighted:
+            # Destaque se selecionado
+            attr_keys = ["combat_power", "wisdom", "justice", "eternity"]
+            if self.highlight_attr == attr_keys[i]:
                 self.create_rectangle(
-                    15, y - 12, self.card_width - 15, y + 18,
+                    x - 18, attr_y - 8, x + 28, attr_y + 18,
                     fill=colors["accent"], outline=""
                 )
             
-            # Símbolo do atributo
-            symbol = self.ATTR_SYMBOLS.get(key, "•")
             self.create_text(
-                30, y,
-                text=symbol,
-                font=("Segoe UI Emoji", 12)
-            )
-            
-            # Nome do atributo
-            text_color = colors["bg"] if is_highlighted else colors["fg"]
-            self.create_text(
-                55, y,
+                x, attr_y,
                 text=label,
-                font=("Georgia", 9),
-                fill=text_color,
-                anchor="w"
+                font=("Georgia", 7),
+                fill=colors["accent"]
             )
-            
-            # Barra de valor
-            bar_width = 60
-            bar_height = 10
-            bar_x = self.card_width - 80
-            
-            # Fundo da barra
-            self.create_rectangle(
-                bar_x, y - 5, bar_x + bar_width, y + 5,
-                fill="#333333", outline=colors["border"]
-            )
-            
-            # Preenchimento da barra
-            fill_width = (value / 100) * bar_width
-            bar_color = self._get_value_color(value)
-            self.create_rectangle(
-                bar_x, y - 5, bar_x + fill_width, y + 5,
-                fill=bar_color, outline=""
-            )
-            
-            # Valor numérico
             self.create_text(
-                self.card_width - 20, y,
+                x, attr_y + 12,
                 text=str(value),
-                font=("Georgia", 10, "bold"),
-                fill=text_color
+                font=("Georgia", 9, "bold"),
+                fill=self._get_value_color(value)
             )
     
     def _get_value_color(self, value: int) -> str:
@@ -399,14 +366,14 @@ class VisualCard(tk.Canvas):
     
     def draw_special_indicators(self, colors: dict):
         """Desenha indicadores especiais."""
-        y = self.card_height - 25
+        y = self.card_height - 12
         
         # Super Trunfo
         if self.card.is_super_trump:
             self.create_text(
                 self.card_width // 2, y,
-                text="⭐ SUPER TRUNFO ⭐",
-                font=("Georgia", 10, "bold"),
+                text="SUPER TRUNFO",
+                font=("Georgia", 8, "bold"),
                 fill="#ffd700"
             )
         
@@ -414,8 +381,8 @@ class VisualCard(tk.Canvas):
         elif self.card.is_protected:
             self.create_text(
                 self.card_width // 2, y,
-                text=f"🛡️ Protegida ({self.card.protection_turns})",
-                font=("Georgia", 9),
+                text=f"PROTEGIDA ({self.card.protection_turns})",
+                font=("Georgia", 7),
                 fill="#00ff88"
             )
     

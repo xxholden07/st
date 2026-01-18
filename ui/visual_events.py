@@ -102,7 +102,7 @@ class RagnarokAnimation(EventAnimation):
         if 20 < self.frame < 100:
             self.canvas.create_text(
                 self.width // 2, self.height // 2,
-                text="⚡ RAGNARÖK ⚡",
+                text="RAGNARÖK",
                 font=("Georgia", 48, "bold"),
                 fill="#ff4400",
                 tags="ragnarok"
@@ -158,7 +158,7 @@ class OsirisJudgmentAnimation(EventAnimation):
         # Texto
         self.canvas.create_text(
             cx, 80,
-            text="⚖️ JULGAMENTO DE OSÍRIS ⚖️",
+            text="JULGAMENTO DE OSÍRIS",
             font=("Georgia", 32, "bold"),
             fill="#ffd700",
             tags="osiris"
@@ -167,11 +167,11 @@ class OsirisJudgmentAnimation(EventAnimation):
         # Resultado (após frame 80)
         if self.frame > 80:
             if self.passed:
-                result_text = "✨ PASSOU NO JULGAMENTO ✨"
+                result_text = "PASSOU NO JULGAMENTO"
                 result_color = "#00ff88"
                 sub_text = f"Coração puro (Justiça: {self.justice_value})"
             else:
-                result_text = "💀 DEVORADO POR AMMIT 💀"
+                result_text = "DEVORADO POR AMMIT"
                 result_color = "#ff4444"
                 sub_text = f"Coração pesado (Justiça: {self.justice_value})"
             
@@ -329,7 +329,7 @@ class BifrostAnimation(EventAnimation):
         if self.frame > 50:
             self.canvas.create_text(
                 self.width // 2, self.height - 80,
-                text=f"✨ {self.card_name} atravessa a ponte! ✨",
+                text=f"{self.card_name} atravessa a ponte!",
                 font=("Georgia", 20),
                 fill="#ffd700",
                 tags="bifrost"
@@ -451,7 +451,7 @@ class MysteriesAnimation(EventAnimation):
         # Texto
         self.canvas.create_text(
             cx, 80,
-            text="🌙 MISTÉRIOS DE ÍSIS/ORFEU 🌙",
+            text="MISTÉRIOS DE ÍSIS/ORFEU",
             font=("Georgia", 28, "bold"),
             fill="#00ff88",
             tags="mysteries"
@@ -460,7 +460,7 @@ class MysteriesAnimation(EventAnimation):
         if self.frame > 30:
             self.canvas.create_text(
                 cx, self.height - 80,
-                text=f"✨ {self.num_protected} carta(s) protegida(s) por 3 rodadas ✨",
+                text=f"{self.num_protected} carta(s) protegida(s) por 3 rodadas",
                 font=("Georgia", 18),
                 fill="#88ffcc",
                 tags="mysteries"
@@ -475,10 +475,13 @@ class BattleAnimation(EventAnimation):
     
     def __init__(self, canvas: tk.Canvas, card1_name: str, card2_name: str,
                  attribute: str, value1: int, value2: int, 
-                 winner: int, on_complete: Callable = None):
+                 winner: int, on_complete: Callable = None,
+                 card1_id: str = None, card2_id: str = None):
         super().__init__(canvas, on_complete)
         self.card1_name = card1_name
         self.card2_name = card2_name
+        self.card1_id = card1_id
+        self.card2_id = card2_id
         self.attribute = attribute
         self.value1 = value1
         self.value2 = value2
@@ -487,6 +490,24 @@ class BattleAnimation(EventAnimation):
         self.max_frames = 120
         self.width = canvas.winfo_width() or 800
         self.height = canvas.winfo_height() or 600
+        
+        # Carregar imagens das cartas
+        self.card1_image = None
+        self.card2_image = None
+        self._load_card_images()
+    
+    def _load_card_images(self):
+        """Carrega as imagens das cartas para a batalha."""
+        try:
+            from ui.image_loader import get_image_loader
+            loader = get_image_loader()
+            
+            if self.card1_id:
+                self.card1_image = loader.get_card_image(self.card1_id, width=120, height=160)
+            if self.card2_id:
+                self.card2_image = loader.get_card_image(self.card2_id, width=120, height=160)
+        except Exception as e:
+            print(f"Erro ao carregar imagens da batalha: {e}")
     
     def animate(self):
         """Anima a batalha."""
@@ -512,32 +533,33 @@ class BattleAnimation(EventAnimation):
         left_x = 100 + (cx - 200 - 100) * progress
         right_x = self.width - 100 - (self.width - 100 - cx - 200) * progress
         
-        # Carta 1
+        # Carta 1 (jogador)
         self.draw_battle_card(left_x, cy, self.card1_name, self.value1, 
-                             self.winner == 1 and self.frame > 60)
+                             self.winner == 1 and self.frame > 60, self.card1_image)
         
-        # Carta 2
+        # Carta 2 (oponente)
         self.draw_battle_card(right_x, cy, self.card2_name, self.value2,
-                             self.winner == 2 and self.frame > 60)
+                             self.winner == 2 and self.frame > 60, self.card2_image)
         
-        # VS
+        # VS (sem emoji)
         if self.frame < 60:
             self.canvas.create_text(
                 cx, cy,
-                text="⚔️",
-                font=("Segoe UI Emoji", 48),
+                text="VS",
+                font=("Georgia", 36, "bold"),
+                fill="#ff6600",
                 tags="battle"
             )
         
-        # Atributo
+        # Atributo (sem emojis)
         attr_names = {
-            "combat_power": "⚔️ COMBATE",
-            "wisdom": "📚 SABEDORIA",
-            "justice": "⚖️ JUSTIÇA",
-            "eternity": "∞ ETERNIDADE"
+            "combat_power": "COMBATE",
+            "wisdom": "SABEDORIA",
+            "justice": "JUSTIÇA",
+            "eternity": "ETERNIDADE"
         }
         self.canvas.create_text(
-            cx, 60,
+            cx, 50,
             text=attr_names.get(self.attribute, self.attribute),
             font=("Georgia", 24, "bold"),
             fill="#ffd700",
@@ -547,17 +569,17 @@ class BattleAnimation(EventAnimation):
         # Resultado
         if self.frame > 60:
             if self.winner == 1:
-                result = f"🏆 {self.card1_name} VENCE! 🏆"
+                result = f"{self.card1_name} VENCE!"
                 color = "#00ff88"
             elif self.winner == 2:
-                result = f"🏆 {self.card2_name} VENCE! 🏆"
+                result = f"{self.card2_name} VENCE!"
                 color = "#00ff88"
             else:
-                result = "🤝 EMPATE! 🤝"
+                result = "EMPATE!"
                 color = "#ffff00"
             
             self.canvas.create_text(
-                cx, self.height - 80,
+                cx, self.height - 60,
                 text=result,
                 font=("Georgia", 28, "bold"),
                 fill=color,
@@ -567,9 +589,9 @@ class BattleAnimation(EventAnimation):
         self.frame += 1
         self.animation_id = self.canvas.after(33, self.animate)
     
-    def draw_battle_card(self, x: int, y: int, name: str, value: int, is_winner: bool):
-        """Desenha uma carta simplificada na batalha."""
-        w, h = 150, 200
+    def draw_battle_card(self, x: int, y: int, name: str, value: int, is_winner: bool, card_image=None):
+        """Desenha uma carta na batalha com imagem."""
+        w, h = 150, 220
         
         # Borda de vencedor
         if is_winner:
@@ -581,27 +603,35 @@ class BattleAnimation(EventAnimation):
                     tags="battle"
                 )
         
-        # Carta
+        # Fundo da carta
         self.canvas.create_rectangle(
             x - w//2, y - h//2, x + w//2, y + h//2,
-            fill="#2d1b4e", outline="#9370db", width=2,
+            fill="#1a1a2e", outline="#9370db", width=3,
             tags="battle"
         )
         
-        # Nome
+        # Imagem da carta (se disponível)
+        if card_image:
+            self.canvas.create_image(
+                x, y - 30,
+                image=card_image,
+                tags="battle"
+            )
+        
+        # Nome abaixo da imagem
         self.canvas.create_text(
-            x, y - 40,
-            text=name[:15],
-            font=("Georgia", 14, "bold"),
+            x, y + 55,
+            text=name[:12],
+            font=("Georgia", 12, "bold"),
             fill="#e6e6fa",
             tags="battle"
         )
         
-        # Valor
+        # Valor grande
         self.canvas.create_text(
-            x, y + 20,
+            x, y + 85,
             text=str(value),
-            font=("Georgia", 48, "bold"),
+            font=("Georgia", 36, "bold"),
             fill="#ffd700",
             tags="battle"
         )

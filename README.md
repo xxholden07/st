@@ -2,6 +2,20 @@
 
 Um jogo de cartas colecionáveis baseado em mitologias antigas, onde deuses de quatro panteões disputam a supremacia cósmica!
 
+## ✨ Novidade: Sprites Visuais!
+
+O jogo agora inclui **sprites artísticos** dos 32 deuses e **cenário animado da arena**!
+- 🎨 **Imagens em tela cheia** para cada divindade (grupos 1-8)
+- 🏛️ **Background em camadas** da arena de batalha com animações
+- ⚡ **Efeitos visuais** durante combates (partículas, flash, shake)
+- 🎴 **Verso redesenhado** das cartas com padrão geométrico
+- ✨ **Interface limpa** sem emojis, focada nas artes
+
+### Como Ficou:
+- **Cartas**: Imagem do deus ocupa 65% da altura, informações compactas na base
+- **Arena**: Camadas animadas durante batalhas com partículas de energia
+- **Design**: Minimalista e profissional, focado nas ilustrações dos personagens
+
 ## 🎮 Características
 
 ### Estrutura do Baralho
@@ -56,7 +70,15 @@ st/
 ├── data/
 │   └── deck_data.py     # Dados das 32 cartas
 ├── ui/
-│   └── console_ui.py    # Interface de console
+│   ├── console_ui.py    # Interface de console
+│   ├── visual_ui.py     # Interface gráfica (Tkinter)
+│   ├── visual_card.py   # Componentes de cartas visuais
+│   ├── visual_events.py # Animações de eventos
+│   └── image_loader.py  # Carregador de sprites
+├── personagens/         # 🎨 Recursos visuais
+│   ├── arena_layers/    # Camadas do cenário (bg, mid, fg)
+│   ├── st_card_arts_group1-8/  # Sprites dos deuses
+│   └── medieval_tavern_sfx_pack/  # Efeitos sonoros
 └── tests/
     ├── test_cards.py    # Testes de cartas
     └── test_events.py   # Testes de eventos
@@ -66,6 +88,8 @@ st/
 
 ### Requisitos
 - Python 3.10+
+- Pillow (para interface gráfica com sprites)
+- Tkinter (geralmente incluído no Python)
 
 ### Instalação
 
@@ -78,8 +102,21 @@ python -m venv venv
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # Linux/Mac
 
-# Execute o jogo
+# Instale as dependências
+pip install -r requirements.txt
+
+# Execute o jogo (interface gráfica com sprites)
 python main.py
+
+# Ou execute em modo console
+python -c "from ui.console_ui import ConsoleUI; ConsoleUI().run()"
+```
+
+### Testar Sprites
+
+```bash
+# Verifica se os sprites estão carregando corretamente
+python test_sprites.py
 ```
 
 ### Executar Testes

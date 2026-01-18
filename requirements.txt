@@ -1,5 +1,7 @@
 # Super Trunfo Mitológico - Dependências
-# Para versão console, não há dependências externas obrigatórias
+
+# Interface gráfica e imagens
+Pillow>=10.0.0
 
 # Para testes
 pytest>=7.0.0
